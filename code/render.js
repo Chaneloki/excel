@@ -357,70 +357,62 @@ class GridRenderer {
                         if (e.button !== 0) return;
                         e.stopPropagation();
 
-                        // [新增]: 模擬 Excel 點選儲存格自動填入公式功能
+                        // 模擬 Excel 點選儲存格自動填入公式功能（編輯中的公式格）
                         const editing = state.editingCell;
                         if (editing && editing.el && editing.el.textContent.startsWith('=')) {
-                            // 如果點擊的不是正在編輯的格子
                             if (editing.r !== rIdx || editing.c !== cIdx) {
-                                e.preventDefault(); // 阻止焦點轉移
+                                e.preventDefault();
                                 const targetAddr = String.fromCharCode(65 + cIdx) + (rIdx + 1);
-                                
-                                // 檢查最後一個字元，決定是「替換」還是「追加」
                                 const currentText = editing.el.textContent;
                                 const lastChar = currentText.slice(-1);
                                 const operators = ['+', '-', '*', '/', '(', ',', '='];
-                                
                                 if (operators.includes(lastChar)) {
                                     editing.el.textContent += targetAddr;
                                 } else {
-                                    // 點擊即選取，預設行為：如果是第一個引用的儲存格且前面只有等號，則直接追加；否則提示或加上 +
-                                    if (currentText === "=") {
-                                        editing.el.textContent += targetAddr;
-                                    } else {
-                                        editing.el.textContent += "+" + targetAddr;
-                                    }
+                                    editing.el.textContent += (currentText === "=") ? targetAddr : "+" + targetAddr;
                                 }
-                                
-                                // [新增]: 視覺標記邏輯
                                 state.formulaRefs = state.formulaRefs || [];
                                 state.formulaRefs.push({ r: rIdx, c: cIdx, id: targetAddr });
-                                
-                                // 同步數據至 state
                                 data[editing.r][editing.c] = editing.el.textContent;
-                                
-                                // [修復]: 修改內容後，瀏覽器會重置游標位置到開頭。強制將游標移至文字最後。
                                 const range = document.createRange();
                                 range.selectNodeContents(editing.el);
-                                range.collapse(false); // 摺疊到最後
+                                range.collapse(false);
                                 const sel = window.getSelection();
                                 sel.removeAllRanges();
                                 sel.addRange(range);
-                                
-                                // [新增]: 觸發音效與視覺更新
                                 if (window.uiManager) window.uiManager.playSFX('coin2.mp3', 0.5);
                                 this._updateVisuals(data, maxC, startIdx, endIdx);
                                 return;
                             }
                         }
-                        
-                        // [優化]: 如果點擊在已選取的「多重選取」儲存格內，不要清除清單，僅更新活動格
+
+                        // 單擊只選取儲存格，不進入編輯模式（僅當非當前編輯格時阻止焦點）
+                        const isBeingEdited = editing && editing.r === rIdx && editing.c === cIdx;
+                        if (!isBeingEdited) {
+                            e.preventDefault(); // 阻止 contentEditable 自動獲取焦點
+                        }
+
                         const isPartOfMulti = state.multiSelectedCells && state.multiSelectedCells.some(c => c.r === rIdx && c.c === cIdx);
                         if (isPartOfMulti) {
                             state.selectedCell = { r: rIdx, c: cIdx };
                         } else {
-                            state.multiSelectedCells = []; // 手動選取一般區域時清除多重選取
+                            state.multiSelectedCells = [];
                             state.selectedCell = { r: rIdx, c: cIdx };
                         }
 
-                        const isAlreadyActive = state.selectedCell && state.selectedCell.r === rIdx && state.selectedCell.c === cIdx;
-                        const hasRange = state.selectedRange && (state.selectedRange.minRow !== state.selectedRange.maxRow || state.selectedRange.minCol !== state.selectedRange.maxCol);
-                        
                         state.isSelecting = true;
                         if (!isPartOfMulti) {
                             state.selectedRange = { minRow: rIdx, maxRow: rIdx, minCol: cIdx, maxCol: cIdx };
                         }
-                        
+
                         this._updateVisuals(data, maxC, startIdx, endIdx);
+                    },
+                    ondblclick: (e) => {
+                        e.stopPropagation();
+                        // 雙擊進入編輯模式（若未在編輯其他格）
+                        if (!state.editingCell) {
+                            e.target.focus();
+                        }
                     },
                     onmouseover: (e) => {
                         if (state.isSelecting) {

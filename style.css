@@ -354,22 +354,24 @@ body {
     100% { outline-offset: -2px; }
 }
 
-.fill-handle { 
-    position: absolute; width: 8px; height: 8px; background: var(--excel-green); 
-    right: -4px; bottom: -4px; cursor: crosshair; z-index: 300; 
-    border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+/* 填充柄：本體設為 20×20 透明點擊區，以 ::after 渲染 8×8 的視覺方塊 */
+.fill-handle {
+    position: absolute;
+    width: 20px; height: 20px;
+    background: transparent;
+    right: -10px; bottom: -10px;
+    cursor: crosshair; z-index: 300;
 }
 
-/* [新增]: 擴大填充柄的感應區域 (Hitbox)，方便用戶點擊而不影響視覺 */
-.fill-handle::before {
+.fill-handle::after {
     content: '';
     position: absolute;
-    top: -10px;
-    left: -10px;
-    right: -10px;
-    bottom: -10px;
-    /* background: rgba(255,0,0,0.1); /* 調試用，實際應保持透明 */
-    z-index: -1;
+    width: 8px; height: 8px;
+    background: var(--excel-green);
+    right: 0; bottom: 0;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    pointer-events: none;
 }
 
 /* --- 🎯 Outline Sidebar (Subtotal levels) --- */

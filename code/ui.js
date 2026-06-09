@@ -643,6 +643,56 @@ class UIManager {
             if (e.ctrlKey && (k === ';' || k === ':')) { e.preventDefault(); this.triggerAction('insertdate'); return; }
             if (e.ctrlKey && k === 'e') { e.preventDefault(); this.triggerAction('open_format_dialog'); return; }
             if (k === 'alt' && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); this.triggerAction('freezepanes'); return; }
+
+            // --- Excel 式鍵盤操作（無編輯中時對選取格生效）---
+            if (!state.editingCell && state.selectedCell) {
+                const { r, c } = state.selectedCell;
+                const cell = window.gridRenderer?.cellMap.get(`${r},${c}`);
+                if (!cell) return;
+
+                // F2：進入編輯模式（游標移至末尾，保留內容）
+                if (e.key === 'F2') {
+                    e.preventDefault();
+                    cell.focus();
+                    return;
+                }
+
+                // Delete / Backspace：清空儲存格內容
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    const oldVal = cell.textContent;
+                    if (oldVal !== '') {
+                        cell.textContent = '';
+                        state.gridData[r][c] = '';
+                        window.orchestrator.handleCellEdit(r, c, oldVal, '');
+                        if (window.gridRenderer) window.gridRenderer._updateVisuals(state.gridData, state.gridData[0].length);
+                    }
+                    return;
+                }
+
+                // 可見字元：清空並開始編輯（Excel 行為：打字直接覆蓋舊內容）
+                if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                    e.preventDefault();
+                    const key = e.key;
+                    cell.textContent = '';
+                    state.gridData[r][c] = '';
+                    cell.focus();
+                    // 焦點建立後插入字元並移游標至末尾
+                    requestAnimationFrame(() => {
+                        if (cell.isConnected) {
+                            cell.textContent = key;
+                            state.gridData[r][c] = key;
+                            const range = document.createRange();
+                            range.selectNodeContents(cell);
+                            range.collapse(false);
+                            const sel = window.getSelection();
+                            sel.removeAllRanges();
+                            sel.addRange(range);
+                        }
+                    });
+                    return;
+                }
+            }
         };
 
         document.onkeyup = (e) => {

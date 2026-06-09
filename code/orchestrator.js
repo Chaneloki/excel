@@ -656,13 +656,13 @@ class Orchestrator {
                 if (window.gridRenderer) window.gridRenderer.render();
                 this.playStorySegment("fail_FORMULA_text_unhandled");
             } else if (formula === `${d}*1+${e}+${f}` || formula === `${d}+0+${e}+${f}`) {
-                // 正確處理
+                // 正確處理：動畫填滿後還原公式字串，讓使用者可手動拖拉體驗相對引用
                 this._simulateDragFill(rIdx, cIdx, (r) => {
                     const wu = parseFloat(data[r][3]) || 0;
                     const wen = parseFloat(data[r][4]) || 0;
                     const ce = parseFloat(data[r][5]) || 0;
                     return wu + wen + ce;
-                });
+                }, val);
                 this.validateAction("FORMULA_SUM_APPLY");
             }
         } 
@@ -685,7 +685,7 @@ class Orchestrator {
                     const wen = parseFloat(data[r][4]) || 0;
                     const ce = parseFloat(data[r][5]) || 0;
                     return wu + wen + (ce * 1.5);
-                });
+                }, val);
                 this.validateAction("ABS_REF_APPLY");
             }
         }
@@ -702,13 +702,13 @@ class Orchestrator {
             
             const expectedRow = rIdx + 1;
             if (formula === `RANK(G${expectedRow},$G$2:$G$21,0)`) {
-                // 收集所有分數進行排名
+                // 收集所有分數（支援 G 欄存放公式字串的情況）
                 const scores = [];
-                for(let r=1; r<=20; r++) scores.push(parseFloat(data[r][6]) || 0);
+                for(let r=1; r<=20; r++) scores.push(this._evalCh7Cell(r, 6));
                 const sorted = [...scores].sort((a,b) => b - a);
-                
+
                 this._simulateDragFill(rIdx, cIdx, (r) => {
-                    const s = parseFloat(data[r][6]) || 0;
+                    const s = this._evalCh7Cell(r, 6);
                     return sorted.indexOf(s) + 1;
                 });
                 this.validateAction("RANK_APPLY");
@@ -742,20 +742,41 @@ class Orchestrator {
     /**
      * 模擬往下拖拉填滿 (為 Ch7 提供視覺反饋)
      */
-    _simulateDragFill(startRow, cIdx, calcFn) {
+    _simulateDragFill(startRow, cIdx, calcFn, formulaStr) {
         const data = this.state.gridData;
         let r = startRow;
-        
-        // 簡單的動畫效果，一格格填滿
+
         const interval = setInterval(() => {
             if (r > 20) {
                 clearInterval(interval);
+                // 動畫結束後，將公式字串還原到來源格，讓使用者可以手動拖拉體驗相對引用
+                if (formulaStr !== undefined) {
+                    data[startRow][cIdx] = formulaStr;
+                    if (window.gridRenderer) window.gridRenderer.render();
+                }
                 return;
             }
             data[r][cIdx] = calcFn(r);
             if (window.gridRenderer) window.gridRenderer.render();
             r++;
         }, 50);
+    }
+
+    // 計算 ch7 儲存格的數值（支援公式字串與純數值）
+    _evalCh7Cell(r, c) {
+        const data = this.state.gridData;
+        const val = data[r] ? data[r][c] : null;
+        if (val === null || val === undefined) return 0;
+        const str = val.toString().trim();
+        if (!str.startsWith('=')) return parseFloat(str) || 0;
+        if (c === 6) { // G 欄（總分）
+            const wu  = parseFloat(data[r][3]) || 0;
+            const wen = parseFloat(data[r][4]) || 0;
+            const ce  = parseFloat(data[r][5]) || 0;
+            const k1  = parseFloat(data[0][10]) || 1.5;
+            return /\$?K\$?1/i.test(str) ? wu + wen + ce * k1 : wu + wen + ce;
+        }
+        return parseFloat(str) || 0;
     }
 
     /**
