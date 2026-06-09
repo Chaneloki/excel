@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+    <title>Excel 魔法冒險 V2 - 巔峰視覺版</title>
+    <!-- [基因還原] 使用 v45 原始樣式表 -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- [Notice Overlay] v45 啟動公告 -->
+    <div id="notice-overlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:10000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(10px); color:#fff; transition:0.5s;">
+        <!-- ... (原本內容保持不變) ... -->
+        <div id="notice-card" style="width:450px; background:#fffdf5; border:10px double #8b4513; border-radius:15px; padding:30px; box-shadow:0 0 50px rgba(255,215,0,0.2); color:#3e2723; text-align:center;">
+            <h2 id="notice-title" style="margin-top:0; color:#8b4513; font-family:serif;">📜 《試算表魔導書》修復公告</h2>
+            <div id="notice-content" style="text-align:left; line-height:1.6; margin:20px 0; background:rgba(139,69,19,0.05); padding:20px; border-radius:8px; border:1px dashed #d2b48c; max-height:300px; overflow-y:auto;">
+                <div style="margin-bottom:15px; border-bottom:1px solid #d2b48c; padding-bottom:10px;">
+                    <strong style="color:#b22222;">🚀 當前開發進度：</strong><br>
+                    - [完成] v2 引擎核心行為驅動重構<br>
+                    - [完成] Ch1 ~ Ch5 劇情與模擬器實作<br>
+                    - [完成] 指南手冊與冒險者回饋系統<br>
+                    - [更新] 點擊彩蛋系統與響應式視窗適配
+                </div>
+                <div style="margin-bottom:15px;">
+                    <strong style="color:#217346;">📅 本次更新 (2026/05/30)：</strong><br>
+                    - <b>第五章上線</b>：體驗米羅與夏特的故鄉羈絆。<br>
+                    - <b>性能優化</b>：提升大規模數據渲染流暢度。<br>
+                    - <b>快捷跳轉</b>：開發者工具已支援第五章各階段。
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <button id="notice-btn" onclick="window.orchestrator.start()" style="width:100%; padding:18px; background:#8b4513; color:#fdf5e6; border:none; border-radius:8px; cursor:pointer; font-weight:bold; font-size:20px; box-shadow:0 6px 15px rgba(0,0,0,0.4); transition:0.3s;">✨ 開始冒險</button>
+                <div style="display:flex; gap:10px;">
+                    <button id="load-btn" onclick="window.orchestrator.loadGame()" style="flex:1; padding:12px; background:rgba(33,115,70,0.1); color:#217346; border:2px solid #217346; border-radius:8px; cursor:pointer; font-weight:bold; font-size:15px; transition:0.2s;">📜 讀取進度</button>
+                    <button onclick="window.uiManager.jumpToChapter('50', 'STORY_START')" style="flex:1; padding:12px; background:rgba(139,69,19,0.1); color:#8b4513; border:2px solid #8b4513; border-radius:8px; cursor:pointer; font-weight:bold; font-size:15px; transition:0.2s;">⚡ 直接測第五章</button>
+                </div>
+            </div>
+            <p style="font-size:12px; color:#8b4513; margin-top:15px; opacity:0.6;">提示：建議手動讀取上次未完成的禁術修煉</p>
+        </div>
+    </div>
+
+    <div id="coin-display">💰 <span id="coin-count">0</span> G</div>
+
+    <!-- [Story Phase] v45 劇場結構 -->
+    <div id="story-overlay" onclick="window.uiManager.nextStoryLine()">
+        <div id="story-stage">
+            <!-- [新增] 背景模糊層：位於背景之上，人物之下 -->
+            <div id="story-bg-blur"></div>
+            <div class="char-container"><img src="" id="a-ma" class="char-img"></div>
+            <div class="char-container"><img src="" id="a-f" class="char-img"></div>
+            <div class="char-container"><img src="" id="a-l" class="char-img"></div>
+            <div class="char-container" id="main-char-container"><img src="" id="a-m" class="char-img"></div>
+            <!-- [新增] 物品/元素/道具層 -->
+            <div id="stuff-container" style="position:absolute; inset:0; pointer-events:none; z-index:10; display:flex; justify-content:center; align-items:center;">
+                <img src="" id="story-stuff" style="max-width:80%; max-height:80%; opacity:0; transition:0.3s; transform:scale(0.8);">
+            </div>
+            <!-- [新增] 環境大氣特效層 (如：煙霧、霧氣、魔法粒子) -->
+            <div id="env-container" style="position:absolute; inset:0; pointer-events:none; z-index:12; overflow:hidden; opacity:0; transition:opacity 1.5s;">
+                <img src="" id="story-env" style="width:120%; height:120%; position:absolute; top:-10%; left:-10%; object-fit:cover;">
+            </div>
+            <div class="char-container"><img src="" id="a-g" class="char-img"></div>
+            <div class="char-container"><img src="" id="a-b" class="char-img"></div>
+        </div>
+        <div id="dialogue-box">
+            <p id="s-name">START GAME</p>
+            <p id="s-text">Press the 繼續</p>
+            <div style="position:absolute; right:5%; bottom:20px; display:flex; gap:10px;">
+                <button onclick="event.stopPropagation(); window.uiManager.skipStory()" class="btn-next" style="background:#5d4037; position:static">跳過劇情</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [Simulator Phase] v45 遊戲結構 -->
+    <div id="game-main" style="display: none; opacity: 0;">
+        <div id="top-row">
+            <div id="left-sidebar">
+                <div id="elf-panel">
+                    <img src="Charater/fairy.png" id="elf-img">
+                    <div id="elf-bubble">
+                        <p id="e-t"></p>
+                        <span id="t-t"></span>
+                        <button id="btn-game-next" style="display:none" onclick="window.orchestrator.nextTask()">聽導師指示</button>
+                    </div>
+                </div>
+                <div id="player-box">
+                    <div class="p-bubble">
+                        <p id="p-t"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="excel-container">
+                <div id="excel-area">
+                    <div id="ribbon">
+                        <div class="ribbon-tabs">
+                            <div class="tab" id="tab-start" onclick="window.uiManager.switchTab('start')">常用</div>
+                            <div class="tab" id="tab-insert" onclick="window.uiManager.switchTab('insert')">插入</div>
+                            <div class="tab" id="tab-data" onclick="window.uiManager.switchTab('data')">資料</div>
+                            <div class="tab active" id="tab-view" onclick="window.uiManager.switchTab('view')">檢視</div>
+                        </div>
+                        <div class="ribbon-buttons" id="ribbon-btns">
+                            <!-- 由渲染器根據解鎖狀態注入 -->
+                        </div>
+                    </div>
+                    <div class="wrapper" id="wrapper">
+                        <div id="green-line" class="gl"></div>
+                        <!-- 關鍵：對齊 v45 CSS 的渲染目標 -->
+                        <div id="grid" class="grid"></div>
+                    </div>
+                    <div id="sheet-bar">
+                        <div class="sheet active" id="st-1">🛡️ 裝備清單</div>
+                        <div id="add-sheet" onclick="window.uiManager.triggerAction('addsheet')">+</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 全域元件 -->
+    <div id="s-btn" onclick="window.uiManager.openSkills()">📜</div>
+    
+    <!-- [新增] 開發者工具按鈕 -->
+    <div id="dev-btn" onclick="window.uiManager.openDevMenu()" style="position:fixed; right:25px; top:85px; width:45px; height:45px; background:#444; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; cursor:pointer; z-index:7000; border:2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition:0.3s; opacity:0.6;">🛠️</div>
+
+    <!-- [新增] 全螢幕切換按鈕 -->
+    <div id="fs-btn" onclick="window.uiManager.toggleFullscreen()" style="position:fixed; right:25px; top:155px; width:45px; height:45px; background:#2c3e50; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; cursor:pointer; z-index:7000; border:2px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition:0.3s; opacity:0.6;">⛶</div>
+
+    <!-- [新增] 開發者跳轉選單 -->
+    <div id="dev-modal" class="modal-layer" style="display:none; z-index:8000;">
+        <div id="dev-card" style="width:300px; max-height:80vh; overflow-y:auto; background:#fff; border-radius:10px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.5);">
+            <h3 style="margin-top:0; color:#333; border-bottom:1px solid #eee; padding-bottom:10px;">🛠️ 開發者跳轉</h3>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第一章 (Ch1)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('10', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('10', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('10', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 1.5 章 (Ch1.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('15', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('15', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('15', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第二章 (Ch2)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('20', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('20', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('20', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 2.5 章 (Ch2.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('25', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('25', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('25', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第三章 (Ch3)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('30', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('30', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('30', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 3.5 章 (Ch3.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('35', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('35', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('35', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第四章 (Ch4)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('40', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('40', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('40', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 4.5 章 (Ch4.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('45', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('45', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('45', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第五章 (Ch5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('50', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('50', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('50', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 5.5 章 (Ch5.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('55', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('55', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('55', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第六章 (Ch6)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('60', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('60', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('60', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 6.5 章 (Ch6.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('65', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('65', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('65', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第七章 (Ch7)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('70', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('70', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('70', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;">
+                    <div style="font-size:12px; color:#666; grid-column: span 2;">第 7.5 章 (Ch7.5)：</div>
+                    <button onclick="window.uiManager.jumpToChapter('75', 'STORY_START')" class="dev-opt" style="font-size:11px;">開場劇情</button>
+                    <button onclick="window.uiManager.jumpToChapter('75', 'SIMULATOR')" class="dev-opt" style="font-size:11px;">遊戲階段</button>
+                    <button onclick="window.uiManager.jumpToChapter('75', 'STORY_END')" class="dev-opt" style="font-size:11px;">結束劇情</button>
+                </div>
+
+                <p style="font-size:12px; color:#666; margin:0;">當前章節自定義段落：</p>
+                <div id="dev-segments" style="display:flex; flex-direction:column; gap:5px;"></div>
+            </div>
+            <button onclick="window.uiManager.openDevMenu()" style="margin-top:20px; width:100%; padding:10px; background:#eee; border:none; border-radius:5px; cursor:pointer;">關閉</button>
+        </div>
+    </div>
+
+    <!-- [新增] Excel 下拉選單 -->
+    <div id="dropdown-menu" class="dropdown-layer" style="display:none">
+        <div id="dropdown-content"></div>
+    </div>
+    
+    <div id="trial-modal" class="modal-layer" style="display:none">
+        <div id="trial-card">
+            <h2 style="color:#8b4513; margin-bottom:20px;">🔮 禁術抉擇</h2>
+            <p id="trial-situation"></p>
+            <div id="trial-options" style="display:flex; flex-direction:column; gap:12px;"></div>
+        </div>
+    </div>
+
+    <!-- [技能系統模組] -->
+    <div id="s-modal" class="modal-layer" style="display:none">
+        <div id="s-card">
+            <div id="s-header">
+                <h3>📜 試算表禁術大全</h3>
+                <button onclick="window.uiManager.openSkills()" class="close-btn">×</button>
+            </div>
+            <div id="s-tabs">
+                <button class="skill-tab active" onclick="window.uiManager.setSkillFilter('all', this)">全部</button>
+                <button class="skill-tab" onclick="window.uiManager.setSkillFilter('move', this)">移動</button>
+                <button class="skill-tab" onclick="window.uiManager.setSkillFilter('org', this)">整理</button>
+                <button class="skill-tab" onclick="window.uiManager.setSkillFilter('data', this)">數據</button>
+            </div>
+            <div id="s-search-box">
+                <input type="text" id="skill-search" placeholder="搜尋禁術..." oninput="window.uiManager.debounceSearch()">
+            </div>
+            <div id="s-list">
+                <!-- 技能卡片由 JS 動態生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 領悟特效 -->
+    <div id="skill-toast" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#ffd700; padding:20px 40px; border:2px solid #ffd700; border-radius:10px; z-index:11000; text-align:center; animation: bounceIn 0.8s;">
+        <h2 style="margin:0">✨ 領悟禁術 ✨</h2>
+        <p id="skill-toast-name" style="margin:10px 0 0 0; font-size:20px; font-weight:bold;"></p>
+    </div>
+
+    <!-- [新增] 皇家信箋 UI -->
+    <div id="letter-modal" class="modal-layer" style="display:none; background:rgba(0,0,0,0.7); backdrop-filter:blur(5px);">
+        <div id="letter-body" class="letter-paper">
+            <div class="letter-seal">👑</div>
+            <div class="letter-content">
+                <h2 style="text-align:center; color:#8b4513; font-family:serif;">📜 皇家徵召令</h2>
+                <hr style="border:1px dashed #d2b48c; margin:20px 0;">
+                <p>親愛的 冒險者：</p>
+                <p>鑑於您在「公會物資名冊」展現出的卓越數據禁術，王城典儀廳現誠摯邀請您前往參與<b>「皇家國庫清算行動」</b>。</p>
+                <p>這是一項關乎王國基業的神聖任務，請務必於明晨準時抵達王城北大門。</p>
+                <p style="text-align:right; margin-top:30px;">── 王城典儀廳 首席大書記官</p>
+            </div>
+            <button onclick="window.uiManager.hideLetter()" class="letter-close-btn">收起信箋</button>
+        </div>
+    </div>
+
+    <!-- [新增] 自定義右鍵選單 -->
+    <div id="context-menu" class="dropdown-layer" style="display:none; min-width: 160px; z-index: 9000;">
+        <div class="dropdown-item" onclick="window.uiManager.openFormatDialog('number')">
+            <span class="icon">⚙️</span><span class="text">設定儲存格格式(F)...</span>
+        </div>
+        <div style="border-top:1px solid #eee; margin:5px 0;"></div>
+        <div class="dropdown-item disabled" style="opacity:0.5; cursor:not-allowed;">
+            <span class="icon">📋</span><span class="text">貼上</span>
+        </div>
+    </div>
+
+    <!-- [新增] 進階篩選對話框 (Advanced Filter) -->
+    <div id="excel-adv-filter-modal" class="modal-layer" style="display:none; background:rgba(0,0,0,0.5);">
+        <div class="excel-dialog" style="width: 350px;">
+            <div class="excel-dialog-header">
+                <span>進階篩選</span>
+                <button class="excel-close" onclick="window.uiManager.closeAdvFilterDialog()">×</button>
+            </div>
+            <div class="excel-dialog-body" style="padding: 15px;">
+                <div style="font-size:11px; margin-bottom:10px;">方式</div>
+                <div style="margin-left:20px; font-size:11px; display:flex; flex-direction:column; gap:5px;">
+                    <label><input type="radio" name="filter-action" checked> 在原有區域顯示篩選結果(F)</label>
+                    <label><input type="radio" name="filter-action" disabled> 將篩選結果複製到其他位置(O)</label>
+                </div>
+                
+                <div style="margin-top:15px; display:grid; grid-template-columns: 80px 1fr 25px; gap:10px; align-items:center;">
+                    <label style="font-size:11px;">資料範圍(L):</label>
+                    <input type="text" value="$A$1:$G$31" disabled style="font-size:11px; padding:2px; border:1px solid #ccc;">
+                    <button style="padding:0; height:18px;">📉</button>
+
+                    <label style="font-size:11px;">條件範圍(C):</label>
+                    <input type="text" id="adv-filter-criteria" placeholder="請選取條件區域..." style="font-size:11px; padding:2px; border:1px solid #217346;">
+                    <button style="padding:0; height:18px;">📉</button>
+                </div>
+
+                <div style="margin-top:15px; font-size:11px;">
+                    <label><input type="checkbox"> 僅選取不重複的紀錄(R)</label>
+                </div>
+            </div>
+            <div class="excel-dialog-footer">
+                <button class="excel-ok" onclick="window.uiManager.confirmAdvFilterDialog()" style="padding: 5px 25px;">確定</button>
+                <button class="excel-cancel" onclick="window.uiManager.closeAdvFilterDialog()" style="padding: 5px 25px;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [新增] 排序對話框 (Multi-level Sort) -->
+    <div id="excel-sort-modal" class="modal-layer" style="display:none; background:rgba(0,0,0,0.5);">
+        <div class="excel-dialog" style="width: 550px;">
+            <div class="excel-dialog-header">
+                <span>排序</span>
+                <button class="excel-close" onclick="window.uiManager.closeSortDialog()">×</button>
+            </div>
+            <div class="excel-dialog-body" style="padding: 15px;">
+                <!-- 工具列 -->
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button class="excel-ok" onclick="window.uiManager.addSortLevel()" style="font-size:11px; padding:3px 10px; width:auto;">➕ 新增層級(A)</button>
+                    <button class="excel-ok" onclick="window.uiManager.deleteSortLevel()" style="font-size:11px; padding:3px 10px; width:auto;">➖ 刪除層級(D)</button>
+                    <button class="excel-ok" style="font-size:11px; padding:3px 10px; opacity:0.5; cursor:not-allowed; width:auto;">复制層級</button>
+                    <div style="flex:1"></div>
+                    <label style="font-size:11px; display:flex; align-items:center;"><input type="checkbox" checked disabled style="margin-right:5px;"> 我的資料有標題(H)</label>
+                </div>
+
+                <!-- 排序層級列表 -->
+                <div style="border:1px solid #999; background:#fff; height:180px; overflow-y:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                        <thead style="background:#f5f5f5; position:sticky; top:0; border-bottom:1px solid #ccc;">
+                            <tr>
+                                <th style="width:180px; padding:5px; text-align:left; border-right:1px solid #ddd;">欄位</th>
+                                <th style="width:150px; padding:5px; text-align:left; border-right:1px solid #ddd;">排序對象</th>
+                                <th style="padding:5px; text-align:left;">順序</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sort-levels-body">
+                            <!-- 動態插入層級 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="excel-dialog-footer">
+                <button class="excel-ok" onclick="window.uiManager.confirmSortDialog()" style="padding: 5px 30px;">確定</button>
+                <button class="excel-cancel" onclick="window.uiManager.closeSortDialog()" style="padding: 5px 30px;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [皇家級 Excel：儲存格格式對話框] -->
+    <div id="excel-format-modal" class="modal-layer" style="display:none; background:rgba(0,0,0,0.5);">
+        <div class="excel-dialog">
+            <div class="excel-dialog-header">
+                <span>設定儲存格格式</span>
+                <button onclick="window.uiManager.closeFormatDialog()" class="excel-close">×</button>
+            </div>
+            <!-- 分頁標籤欄 (可被隱藏) -->
+            <div class="excel-dialog-tabs" id="excel-tabs-strip">
+                <div class="excel-tab" data-tab="number" onclick="window.uiManager.switchFormatTab('number')">數字</div>
+                <div class="excel-tab" data-tab="align" onclick="window.uiManager.switchFormatTab('align')">對齊</div>
+                <div class="excel-tab" data-tab="font" onclick="window.uiManager.switchFormatTab('font')">字型</div>
+                <div class="excel-tab active" data-tab="border" onclick="window.uiManager.switchFormatTab('border')">框線</div>
+                <div class="excel-tab" data-tab="fill" onclick="window.uiManager.switchFormatTab('fill')">填滿</div>
+            </div>
+            
+            <div class="excel-dialog-body">
+                <!-- [新增] 自訂清單分頁 -->
+                <div id="tab-content-customlist" class="tab-content">
+                    <div style="display:flex; gap:15px; height: 220px;">
+                        <!-- 左側：清單類別 -->
+                        <div style="width:160px; border-right:1px solid #eee; display:flex; flex-direction:column;">
+                            <label style="font-size:11px; color:#333; margin-bottom:5px;">自訂清單(L):</label>
+                            <div id="excel-custom-lists-pane" class="excel-category-list" style="flex:1; overflow-y:auto; border:1px solid #999;">
+                                <div class="category-item active">新清單</div>
+                                <div class="category-item" style="color:#666; font-style:italic;">Sun, Mon, Tue...</div>
+                                <div class="category-item" style="color:#666; font-style:italic;">Jan, Feb, Mar...</div>
+                            </div>
+                        </div>
+                        <!-- 右側：清單項目輸入 -->
+                        <div style="flex:1; display:flex; flex-direction:column;">
+                            <label style="font-size:11px; color:#333; margin-bottom:5px;">清單項目(E):</label>
+                            <textarea id="excel-custom-entries" style="flex:1; width:100%; border:1px solid #999; font-size:12px; padding:5px; resize:none; font-family: sans-serif;" placeholder="輸入項目後按 Enter 分隔..."></textarea>
+                            <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+                                <button onclick="window.uiManager.addCustomListFromUI()" style="padding:5px 20px; font-size:11px; background:#eee; border:1px solid #888; border-radius:2px; cursor:pointer;">新增(A)</button>
+                            </div>
+                        </div>
+                    </div>
+                    <p id="custom-list-hint" style="font-size:11px; color:#666; margin-top:10px;">提示：在右側輸入「重症」、「中症」、「輕症」（每行一個），然後點擊新增。</p>
+                </div>
+
+                <!-- 數字分頁 -->
+                <div id="tab-content-number" class="tab-content">
+                    <div style="display:flex; gap:15px;">
+                        <div style="width:120px; border-right:1px solid #eee;">
+                            <label style="font-size:11px; color:#666;">類別(C):</label>
+                            <div class="excel-category-list">
+                                <div class="category-item">一般</div>
+                                <div class="category-item">數值</div>
+                                <div class="category-item">貨幣</div>
+                                <div class="category-item active">自訂</div>
+                            </div>
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:11px; color:#333;">類型(T):</label>
+                            <input type="text" value='0"分"' id="custom-format-input" style="width:100%; padding:3px; margin:5px 0; border:1px solid #217346; font-family:monospace;">
+                            <div id="custom-format-list" class="excel-style-box" style="height:100px; font-size:12px;">
+                                <!-- 由 JS 動態生成內容 -->
+                            </div>
+                            <p style="font-size:11px; color:#666; margin-top:10px;">輸入自訂的格式代碼，利用現有的代碼作為起點。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 框線分頁 -->
+                <div id="tab-content-border" class="tab-content" style="display:block;">
+                    <div style="display:flex; gap:20px;">
+                        <!-- 左側：樣式與色彩 -->
+                        <div style="width:120px;">
+                            <label style="font-size:11px; color:#333;">樣式(Y):</label>
+                            <div class="excel-style-box">
+                                <div style="border-bottom:1px solid #333; height:10px; margin:5px 0;"></div>
+                                <div style="border-bottom:1px dashed #333; height:10px; margin:5px 0;"></div>
+                                <div style="border-bottom:2px solid #333; height:10px; margin:5px 0;"></div>
+                                <div style="border-bottom:1px double #333; height:10px; margin:5px 0;"></div>
+                            </div>
+                            <label style="font-size:11px; color:#333; margin-top:10px; display:block;">色彩(C):</label>
+                            <div class="excel-color-picker">自動</div>
+                        </div>
+                        <!-- 右側：預設與預覽 -->
+                        <div style="flex:1;">
+                            <label style="font-size:11px; color:#333;">預設</label>
+                            <div style="display:flex; gap:10px; margin-top:5px;">
+                                <div class="excel-preset"><div style="border:1px dashed #ccc; width:15px; height:15px;"></div>無</div>
+                                <div class="excel-preset"><div style="border:1px solid #333; width:15px; height:15px;"></div>外框</div>
+                                <div class="excel-preset"><div style="border:1px solid #333; width:15px; height:15px; position:relative;"><div style="position:absolute; top:7px; left:0; width:100%; border-top:1px solid #333;"></div><div style="position:absolute; left:7px; top:0; height:100%; border-left:1px solid #333;"></div></div>內框</div>
+                            </div>
+                            <label style="font-size:11px; color:#333; margin-top:15px; display:block;">框線</label>
+                            <div style="display:grid; grid-template-columns: 30px 150px 30px; grid-template-rows: 30px 100px 30px; gap:5px; margin-top:5px;">
+                                <div></div><div class="excel-btn-edge">上</div><div></div>
+                                <div class="excel-btn-edge-v">左</div>
+                                <div class="excel-preview-box">
+                                    <div style="color:#999; font-size:12px; text-align:center; padding-top:40px;">預覽</div>
+                                </div>
+                                <div class="excel-btn-edge-v">右</div>
+                                <div></div><div class="excel-btn-edge">下</div><div></div>
+                            </div>
+                            <!-- 斜線專屬區域 (皇家佈局版) -->
+                            <div style="display:flex; gap:15px; margin-top:15px; justify-content: center; align-items: center;">
+                                <div style="text-align:center;">
+                                    <button class="excel-btn-diag disabled" style="opacity:0.5; cursor:not-allowed;">
+                                        <svg width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4" stroke="#666" stroke-width="2"/></svg>
+                                    </button>
+                                    <div style="font-size:9px; color:#666; margin-top:2px;">反斜線</div>
+                                </div>
+                                <div style="text-align:center;">
+                                    <button onclick="window.ch2Actions.diagonalborder()" class="excel-btn-diag" title="施展斜線禁術">
+                                        <svg width="24" height="24" viewBox="0 0 24 24"><line x1="4" y1="4" x2="20" y2="20" stroke="#333" stroke-width="2"/></svg>
+                                    </button>
+                                    <div style="font-size:9px; color:#333; margin-top:2px; font-weight:bold;">斜線</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="excel-dialog-footer">
+                <button onclick="window.uiManager.confirmFormatDialog()" class="excel-ok">確定</button>
+                <button onclick="window.uiManager.closeFormatDialog()" class="excel-cancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [新增] 賽爾留言條 UI -->
+    <div id="note-modal" class="modal-layer">
+        <div id="note-body" class="fairy-note-body">
+            <div class="ink-splatter splatter-1"></div>
+            <div class="ink-splatter splatter-2"></div>
+            <div class="ink-splatter splatter-3"></div>
+            <div class="note-tag">賽爾的留言</div>
+            <div id="note-content"></div>
+            <button onclick="window.uiManager.hideNote()" class="note-close-btn">收起紙條</button>
+        </div>
+    </div>
+
+    <!-- 背景音樂 -->
+    <audio id="bgm" loop></audio>
+
+    <style>
+        /* 核心全域樣式 */
+        .dev-opt { padding: 10px; text-align: left; background: #f8f9fa; border: 1px solid #ddd; border-radius: 5px; cursor: pointer; transition: 0.2s; font-weight: 600; }
+        .dev-opt:hover { background: #eef7ff; border-color: #217346; color: #217346; }
+
+        /* Excel 對話框核心樣式 */
+        .excel-dialog {
+            width: 460px; background: #f0f0f0; border: 1px solid #888; border-radius: 3px; 
+            font-family: "Microsoft JhengHei", sans-serif; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        }
+        .excel-dialog-header { background: #fff; padding: 5px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; border-bottom: 1px solid #ccc; }
+        .excel-close { border: none; background: transparent; cursor: pointer; font-size: 16px; }
+        .excel-dialog-tabs { display: flex; padding: 10px 10px 0 10px; background: #f0f0f0; border-bottom: 1px solid #fff; }
+        .excel-tab { padding: 5px 15px; font-size: 11px; cursor: pointer; border: 1px solid transparent; border-bottom: none; margin-right: 2px; border-radius: 3px 3px 0 0; }
+        .excel-tab.active { background: #fff; border-color: #ccc; border-bottom: 1px solid #fff; margin-bottom: -1px; }
+        .excel-dialog-body { background: #fff; margin: 0 10px; padding: 20px; border: 1px solid #ccc; border-top: none; }
+        .excel-style-box { border: 1px solid #ccc; height: 120px; padding: 5px; background: #fff; overflow-y: auto; }
+        .excel-color-picker { border: 1px solid #ccc; padding: 3px; font-size: 11px; margin-top: 5px; text-align: center; background: #fff; }
+        .excel-preset { border: 1px solid #ddd; padding: 5px; font-size: 10px; display: flex; flex-direction: column; align-items: center; width: 50px; background: #f9f9f9; }
+        .excel-preview-box { border: 1px solid #ccc; background: #fff; position: relative; }
+        .excel-btn-edge { border: 1px solid #ccc; background: #eee; font-size: 10px; text-align: center; line-height: 25px; cursor: default; }
+        .excel-btn-edge-v { border: 1px solid #ccc; background: #eee; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: default; }
+        .excel-btn-diag { width: 40px; height: 40px; background: #eee; border: 1px solid #bbb; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 2px; }
+        .excel-btn-diag:hover { background: #eef7ff; border-color: #217346; }
+        .excel-btn-diag svg { display: block; }
+        .excel-dialog-footer { padding: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+        .excel-ok, .excel-cancel { padding: 5px 25px; font-size: 12px; border: 1px solid #888; cursor: pointer; border-radius: 2px; }
+        .excel-ok { background: #eee; }
+        .excel-ok:hover { border-color: #217346; background: #eef7ff; }
+
+        /* [新增] 分頁與類別清單樣式 */
+        .excel-category-list { border: 1px solid #ccc; background: #fff; height: 150px; }
+        .category-item { padding: 4px 10px; font-size: 11px; cursor: pointer; color: #333; }
+        .category-item:hover { background: #f0f0f0; }
+        .category-item.active { background: #0078d4; color: #fff; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* [新增] 賽爾登場特效 */
+        .fairy-appear {
+            animation: fairy-entrance 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, 
+                       magic-glow 2s infinite alternate;
+        }
+        @keyframes fairy-entrance {
+            0% { transform: scale(0) rotate(-45deg); opacity: 0; filter: brightness(3); }
+            60% { transform: scale(1.2) rotate(10deg); opacity: 1; filter: brightness(1.5); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); }
+        }
+        @keyframes magic-glow {
+            from { filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.6)); }
+            to { filter: drop-shadow(0 0 20px rgba(255, 215, 0, 1)); }
+        }
+
+        /* [新增] 信箋樣式 */
+        .letter-paper {
+            background: #fdf5e6; width: 400px; padding: 40px; border-radius: 2px; border: 1px solid #d2b48c;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5), 0 0 20px rgba(139,69,19,0.2);
+            position: relative; transform: translateY(50px) rotate(-1deg); opacity: 0;
+            transition: 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .letter-modal-active .letter-paper { transform: translateY(0) rotate(0deg); opacity: 1; }
+        .letter-seal {
+            position: absolute; top: -30px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px;
+            background: #b22222; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            color: #ffd700; font-size: 30px; border: 3px double #ffd700; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .letter-content { font-family: 'Times New Roman', serif; color: #3e2723; line-height: 1.8; font-size: 17px; }
+        .letter-close-btn { margin-top: 30px; width: 100%; padding: 12px; background: #8b4513; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .letter-close-btn:hover { background: #5d4037; }
+
+        @keyframes bounceIn {
+            0% { transform: translateX(-50%) scale(0.3); opacity: 0; }
+            50% { transform: translateX(-50%) scale(1.05); }
+            70% { transform: translateX(-50%) scale(0.9); }
+            100% { transform: translateX(-50%) scale(1); opacity: 1; }
+        }
+
+        /* [新增] 回憶濾鏡特效 */
+        .memory-filter {
+            filter: sepia(0.5) contrast(0.9) brightness(0.8) blur(0.5px);
+            transition: filter 0.8s ease;
+        }
+    </style>
+
+    <!-- [核心腳本載入] -->
+    <!-- [新增] 欄位篩選下拉選單 (Column Filter) -->
+    <div id="filter-dropdown" style="display:none;"></div>
+
+    <script src="code/utils.js?v=52"></script>
+    <script src="code/orchestrator.js?v=52"></script>
+    <script src="chapter/ch1.js?v=52"></script>
+    <script src="chapter/ch1_5.js?v=52"></script>
+    <script src="chapter/ch2.js?v=52"></script>
+    <script src="chapter/ch2.5.js?v=52"></script>
+    <script src="chapter/ch3.js?v=52"></script>
+    <script src="chapter/ch3.5.js?v=52"></script>
+    <script src="chapter/ch4.js?v=52"></script>
+    <script src="chapter/ch4.5.js?v=52"></script>
+    <script src="chapter/ch5.js?v=52"></script>
+    <script src="chapter/ch5.5.js?v=52"></script>
+    <script src="chapter/ch6.js?v=52"></script>
+    <script src="chapter/ch6.5.js?v=52"></script>
+    <script src="chapter/ch7.js?v=52"></script>
+    <script src="chapter/ch7.5.js?v=52"></script>
+    <script src="action/ch1_actions.js?v=52"></script>
+    <script src="action/ch2_actions.js?v=52"></script>
+    <script src="action/ch3_actions.js?v=52"></script>
+    <script src="action/ch4_actions.js?v=52"></script>
+    <script src="action/ch5_actions.js?v=52"></script>
+    <script src="action/ch6_actions.js?v=52"></script>
+    <script src="action/ch7_actions.js?v=52"></script>
+    <script src="code/bridge.js?v=52"></script>
+    <script src="code/ui.js?v=52"></script>
+    <script src="code/ui_dialogs.js?v=52"></script>
+    <script src="code/ui_ribbon.js?v=52"></script>
+    <script src="code/ui_dev.js?v=52"></script>
+    <script src="code/ext_blur.js?v=52"></script>
+    <script src="code/render.js?v=52"></script>
+
+    <script>
+        window.addEventListener('load', () => {
+            if (window.orchestrator) {
+                window.orchestrator.init();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,1036 @@
+/* ==========================================
+   試算表魔法冒險 v2 - 巔峰視覺增強版
+   風格：現代魔法學院 x Microsoft Excel 365
+   ========================================== */
+
+:root {
+    --excel-green: #217346;
+    --excel-green-light: #2da164;
+    --excel-bg: #f3f2f1;
+    --ribbon-bg: #ffffff;
+    --border-color: #e1e1e1;
+    --text-main: #323130;
+    --hover-blue: #eef7ff;
+    --active-blue: #deefff;
+    --sheet-inactive: #f0f0f0;
+    --gold: #ffcf4d;
+    --gold-dark: #b8860b;
+    --magic-purple: #6c5ce7;
+    --parchment: #fdfaf0;
+    --sidebar-bg: #1e1e2e;
+}
+
+body {
+    font-family: 'Segoe UI', 'SF Pro Display', 'Microsoft JhengHei', system-ui;
+    margin: 0;
+    display: flex;
+    height: 100vh;
+    background: #0b0b14;
+    overflow: hidden;
+    color: var(--text-main);
+}
+
+/* --- 故事 UI：沉浸式劇場 --- */
+#story-overlay { 
+    position: fixed; inset: 0; background: radial-gradient(circle at center, #1a1a2e 0%, #000 100%); 
+    color: #fff; display: flex; flex-direction: column; justify-content: flex-end; z-index: 5000; 
+}
+
+#story-stage { 
+    flex-grow: 1; display: flex; justify-content: center; align-items: flex-end; 
+    padding: 0 5%; gap: 20px; overflow: hidden; position: relative; 
+    transition: background 0.5s ease-out; background-size: cover; background-position: center; 
+}
+#story-stage::after { 
+    content: ''; position: absolute; inset: 0; 
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 40%, transparent 100%); 
+    pointer-events: none; /* [關鍵修正]: 否則會擋住立繪的點擊 */
+}
+
+.char-container {
+
+    width: 1000%;
+    height: 100vh;
+    position: absolute;
+    bottom: 0;
+    z-index: 1;
+
+    /* 移除 drop-shadow 以提升效能 */
+
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+    pointer-events: none; /* 容器不接收點擊，讓點擊穿透到圖片 */
+
+} 
+
+/* [位置優化]：主角固定在左側且較小，NPC 統一固定在正中央 */
+#main-char-container { 
+    left: 7%; 
+    transform: translateX(-50%) scale(0.5); 
+    transform-origin: bottom;
+    z-index: 4; 
+    transition: none !important; /* 主角容器無過渡 */
+} 
+#story-stage .char-container:not(#main-char-container) { 
+    left: 50%; 
+    transform: translateX(-50%); 
+}
+
+.char-img { 
+    width: 100%; 
+    height: 100%; 
+    object-fit: contain; 
+    object-position: bottom; 
+    transition: 0.3s ease-out; 
+    opacity: 0; 
+    transform: translateY(30px) scale(0.98); 
+    pointer-events: auto !important; /* [修正]: 必須為 auto 才能接收點擊 */
+    cursor: pointer !important;      /* [新增]: 提示可點擊 */
+}
+
+/* [新增]: 主角登場無特效 (Instant appearance for main character) */
+#a-m {
+    transition: none !important;
+    transform: none !important;
+}
+
+.char-active { opacity: 1 !important; transform: scale(1) translateY(0); z-index: 5; }
+
+#dialogue-box { 
+    height: auto; min-height: 250px; padding: 40px 12% 80px 12%; position: absolute; bottom: 0; left: 0; width: 100%; 
+    z-index: 5500; box-sizing: border-box; cursor: pointer; 
+    background: none; /* 移除黑色陰影背景 */
+}
+#s-name { 
+    color: var(--gold); font-size: 30px; font-weight: 900; margin: 0 0 15px 0; 
+    border-left: 10px solid var(--gold); padding-left: 25px; 
+    text-shadow: 0 0 15px rgba(0,0,0,1), 0 0 5px rgba(0,0,0,1); /* 強大文字陰影確保清晰 */
+    letter-spacing: 3px;
+}
+#s-text { 
+    color: #ffffff; font-size: 26px; line-height: 1.6; margin: 0; 
+    text-shadow: 0 0 15px rgba(0,0,0,1), 0 0 8px rgba(0,0,0,1), 0 2px 4px rgba(0,0,0,0.8);
+    font-weight: 600; /* 加粗字體 */
+}
+
+/* --- 遊戲主界面：魔法試算表架構 --- */
+#game-main { 
+    display: flex; flex-direction: column; width: 100%; height: 100%; 
+    opacity: 0; visibility: hidden; transition: 0.8s ease; 
+    background: var(--excel-bg); 
+}
+#top-row { display: flex; flex-grow: 1; overflow: hidden; position: relative; }
+
+/* 側邊欄：魔導書導師 --- */
+#left-sidebar { 
+    width: 30%; background: var(--sidebar-bg); border-right: 2px solid var(--excel-green); 
+    display: flex; flex-direction: column; z-index: 100; padding: 25px; color: #fff;
+    box-shadow: 15px 0 40px rgba(0,0,0,0.4);
+    flex-shrink: 0;
+    min-width: 320px; /* 保障最低限度可讀性 */
+}
+
+#elf-panel { 
+    width: 100%; display: flex; flex-direction: column; align-items: center; 
+    position: relative; margin-bottom: 30px; 
+}
+#elf-img { 
+    width: 100px !important; /* [修正]: 強制指定模擬器妖精寬度，不影響劇情立繪 */
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 25px rgba(255, 215, 0, 0.4));
+    animation: magic-float 5s ease-in-out infinite, elf-img-pulse 4s ease-in-out infinite; 
+    cursor: pointer; /* 增加點擊感 */
+    pointer-events: auto;
+}
+@keyframes elf-img-pulse {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 25px rgba(255, 215, 0, 0.4)); }
+    50% { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 40px rgba(255, 215, 0, 0.6)); }
+}
+@keyframes magic-float { 
+    0%, 100% { transform: translateY(0) rotate(0deg); } 
+    50% { transform: translateY(-15px) rotate(5deg); } 
+}
+
+.elf-wow {
+    animation: elf-wow-anim 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+@keyframes elf-wow-anim {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4) rotate(10deg); }
+    100% { transform: scale(1); }
+}
+
+#elf-bubble { 
+    background: var(--parchment); border: none; border-radius: 18px; padding: 20px; 
+    margin-top: 25px; width: 100%; box-sizing: border-box; color: #3e2723; 
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 0 60px rgba(139,69,19,0.05);
+    position: relative; border: 2px solid #d2b48c;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+#elf-bubble::before {
+    content: ''; position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    border-left: 14px solid transparent; border-right: 14px solid transparent;
+    border-bottom: 14px solid #d2b48c;
+}
+
+#e-t { font-size: 20px; font-weight: 600; line-height: 1.6; color: #4e342e; }
+#t-t { 
+    display: block; font-weight: 800; color: #b71c1c; font-size: 18px; 
+    border-top: 2px dashed #d2b48c; padding-top: 15px; margin-top: 15px; text-align: center; 
+    text-transform: uppercase; letter-spacing: 1.5px;
+}
+
+#player-box { 
+    background: rgba(255,255,255,0.05); padding: 25px; border-radius: 20px; 
+    margin-top: auto; border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+}
+.p-bubble { color: #e0e0e0; font-size: 19px; font-weight: 500; line-height: 1.5; font-style: italic; }
+
+/* --- 🎯 Ribbon：現代化專業工具列 --- */
+#excel-container { 
+    width: 70%; display: flex; flex-direction: column; background: #fff; 
+    min-width: 400px; overflow: hidden;
+}
+#excel-area { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+#ribbon { background: var(--ribbon-bg); border-bottom: 1px solid var(--border-color); padding: 0; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 50; }
+.ribbon-tabs { display: flex; padding-left: 15px; background: #fff; border-bottom: 1px solid #efefef; }
+.ribbon-tabs .tab { 
+    padding: 10px 25px; font-size: 14px; cursor: pointer; color: #666; 
+    border-bottom: 3px solid transparent; transition: 0.3s; font-weight: 500;
+}
+.ribbon-tabs .tab:hover { background: #f9f9f9; color: var(--excel-green); }
+.ribbon-tabs .tab.active { color: var(--excel-green); border-bottom-color: var(--excel-green); font-weight: 700; background: #fff; }
+
+.ribbon-buttons { 
+    display: flex; align-items: center; padding: 8px 15px; gap: 10px; height: 95px; 
+    background: linear-gradient(to bottom, #fff, #fcfcfc);
+}
+.ribbon-btn { 
+    display: flex; flex-direction: column; align-items: center; justify-content: center; 
+    padding: 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; 
+    cursor: pointer; min-width: 75px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ribbon-btn:hover { 
+    background: var(--hover-blue); border-color: #cde4ff; 
+    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,120,212,0.1);
+}
+.ribbon-btn:active { background: var(--active-blue); transform: translateY(0); }
+
+.ribbon-btn.big span { font-size: 13px; color: var(--text-main); margin-top: 6px; font-weight: 500; }
+.ribbon-btn img { width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+
+/* [新增] 中型橫向按鈕 (用於資料分頁的進階功能) */
+.ribbon-btn.medium-horizontal {
+    flex-direction: row;
+    padding: 5px 12px;
+    min-width: auto;
+    height: 40px;
+    gap: 8px;
+    align-self: flex-start;
+    margin-top: 5px;
+}
+.ribbon-btn.medium-horizontal img {
+    width: 20px;
+    height: 20px;
+}
+.ribbon-btn.medium-horizontal span {
+    font-size: 12px;
+    margin-top: 0;
+    white-space: nowrap;
+}
+
+/* --- 🎯 Grid：高質感網格設計 --- */
+.wrapper { 
+    width: 100%; height: 100%; overflow: auto; position: relative; background: #fff; 
+    scroll-behavior: smooth;
+    /* 移除自定義游標，恢復專業手感 */
+}
+.grid { 
+    display: grid; 
+    background: #fff; 
+    width: fit-content; 
+    min-width: 100%; 
+    padding-bottom: 100px;
+    /* 移除 gap，改用 border 以支援虛擬捲動 */
+}
+
+.l-head { 
+    background: #f8f9fa; color: #5c5c5c; font-size: 12px; font-weight: 600;
+    display: flex; justify-content: center; align-items: center; position: sticky; 
+    top: 0; z-index: 110; height: 32px; 
+    border-right: 1px solid #e1e1e1;
+    border-bottom: 1px solid #e1e1e1;
+    transition: background 0.2s;
+    cursor: cell; 
+    box-sizing: border-box;
+}
+
+.cell {
+    background: #fff; height: 32px; display: block; line-height: 31px;
+    padding: 0 10px; font-size: 14px; position: relative; outline: none;
+    border-right: 1px solid #e1e1e1;
+    border-bottom: 1px solid #e1e1e1;
+    color: #333; overflow: hidden;
+    white-space: nowrap;
+    box-sizing: border-box;
+    transition: background-color 0.05s linear, border-color 0.1s ease;
+}
+.cell:hover { background: #f5faff; }
+
+/* [核心優化]: 選取框魔力流動特效 */
+.cell.selected {
+    box-shadow: inset 0 0 0 2px var(--excel-green);
+    z-index: 5; background: #f0f9f4 !important;
+    overflow: visible !important; /* [修復]: 確保填充柄 (.fill-handle) 不會被隱藏 */
+}
+
+/* [新增]: 填充預覽框樣式 (模擬 Excel 拖拉時的虛線) */
+.cell.fill-preview {
+    box-shadow: inset 0 0 0 1px var(--excel-green);
+    outline: 2px dashed var(--excel-green);
+    outline-offset: -2px;
+    z-index: 6;
+    background: rgba(33, 115, 70, 0.05) !important;
+}
+/* [新增]: 活動格樣式 (在選取範圍中突出顯示) */
+.cell.active {
+    background: #fff !important;
+    box-shadow: inset 0 0 0 2.5px var(--excel-green) !important;
+    z-index: 10;
+}
+
+/* 選取框四角的魔力微光 */
+.cell.selected::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid transparent;
+    background: linear-gradient(90deg, var(--excel-green), #ffd700, var(--excel-green)) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    opacity: 0.5;
+    animation: magic-border-flow 2s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes magic-border-flow {
+    0% { filter: hue-rotate(0deg); opacity: 0.3; }
+    50% { opacity: 0.8; }
+    100% { filter: hue-rotate(360deg); opacity: 0.3; }
+}
+
+.cell.l-sel { background: rgba(33, 115, 70, 0.08) !important; }
+
+.cell.frozen { 
+    position: sticky !important; top: 28px !important; z-index: 200 !important; 
+    border-bottom: 2px solid #217346 !important; background: #f4faf6 !important;
+    font-weight: 600;
+}
+
+/* [新增]: 公式點選引用時的高亮樣式 (模擬 Excel) */
+.cell.formula-ref {
+    outline: 2px solid #0078d4 !important;
+    outline-offset: -2px;
+    background: rgba(0, 120, 212, 0.08) !important;
+    z-index: 8;
+}
+
+/* [新增]: 公式編輯時的「虛線蟻動」效果 (Marching Ants) */
+.cell.formula-marking {
+    box-shadow: inset 0 0 0 2px #217346 !important;
+    outline: 2px dashed #217346 !important;
+    outline-offset: -2px;
+    z-index: 10;
+    animation: marching-ants 0.5s linear infinite;
+}
+
+@keyframes marching-ants {
+    0% { outline-offset: -2px; }
+    50% { outline-offset: -1px; }
+    100% { outline-offset: -2px; }
+}
+
+.fill-handle { 
+    position: absolute; width: 8px; height: 8px; background: var(--excel-green); 
+    right: -4px; bottom: -4px; cursor: crosshair; z-index: 300; 
+    border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* [新增]: 擴大填充柄的感應區域 (Hitbox)，方便用戶點擊而不影響視覺 */
+.fill-handle::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    /* background: rgba(255,0,0,0.1); /* 調試用，實際應保持透明 */
+    z-index: -1;
+}
+
+/* --- 🎯 Outline Sidebar (Subtotal levels) --- */
+.outline-sidebar {
+    background: #f3f2f1;
+    border-right: 1px solid #d1d1d1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 32px; /* Offset for header */
+    width: 30px;
+    grid-column: 1;
+    z-index: 800;
+}
+
+.outline-btn {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #999;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 9px;
+    color: #333;
+    user-select: none;
+    transition: background 0.2s;
+}
+.outline-btn:hover { background: #eef7ff; }
+
+.outline-level-line {
+    width: 1px;
+    background: #ccc;
+    flex-grow: 1;
+    margin: 2px 0;
+}
+
+/* --- 🎯 Sheet Bar：擬真頁籤 --- */
+#sheet-bar { 
+    display: flex; align-items: center; background: #f3f2f1; height: 36px; 
+    padding-left: 20px; border-top: 1px solid var(--border-color); 
+}
+.sheet { 
+    padding: 8px 30px; font-size: 13px; color: #666; background: #e1e1e1; 
+    border: 1px solid #d1d1d1; border-bottom: none; cursor: pointer; 
+    margin-right: 5px; min-width: 100px; text-align: center; position: relative;
+    border-radius: 4px 4px 0 0; transition: all 0.2s;
+}
+.sheet:hover { background: #ececec; color: #333; }
+.sheet.active { 
+    background: #fff; color: var(--excel-green); font-weight: 700; z-index: 10; 
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    border-top: 3px solid var(--excel-green);
+}
+#add-sheet { 
+    width: 28px; height: 28px; font-size: 20px; color: #666; cursor: pointer; 
+    display: flex; align-items: center; justify-content: center; 
+    border-radius: 50%; transition: 0.2s; margin-left: 10px;
+}
+#add-sheet:hover { background: #d1d1d1; color: var(--excel-green); }
+
+/* --- 全域浮動元件 --- */
+#coin-display { 
+    position: fixed; top: 20px; right: 100px; 
+    background: rgba(255,255,255,0.95); color: var(--excel-green); 
+    padding: 8px 20px; border-radius: 50px; font-weight: 800; 
+    border: 2px solid var(--excel-green); z-index: 5500; 
+    box-shadow: 0 4px 15px rgba(33,115,70,0.2);
+    display: flex; align-items: center; gap: 8px; font-size: 16px;
+}
+
+#s-btn { 
+    position: fixed; right: 25px; top: 15px; width: 55px; height: 55px; 
+    background: var(--excel-green); border-radius: 50%; display: flex; 
+    align-items: center; justify-content: center; font-size: 26px; color: #fff; 
+    cursor: pointer; z-index: 7000; border: 3px solid #fff; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform; /* 提升動畫流暢度 */
+}
+#s-btn:hover { transform: scale(1.1) rotate(5deg); }
+
+#fs-btn { 
+    position: fixed; right: 25px; top: 155px; width: 45px; height: 45px; 
+    background: #2c3e50; border-radius: 10px; display: flex; 
+    align-items: center; justify-content: center; font-size: 22px; color: #fff; 
+    cursor: pointer; z-index: 7000; border: 2px solid #fff; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.6;
+    will-change: transform, opacity;
+}
+#fs-btn:hover { transform: scale(1.1); opacity: 1; }
+
+/* --- 模組：禁術大全 (Skills Modal) --- */
+#s-card { 
+    width: 600px; max-height: 80vh; display: flex; flex-direction: column;
+    background: #fff; border-radius: 20px; overflow: hidden;
+    padding: 0 !important; /* 覆蓋通用彈窗 padding，確保標題列貼邊 */
+    border: 3px solid #d2b48c;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+}
+#s-header { 
+    background: var(--excel-green); color: #fff; padding: 15px 25px; 
+    display: flex; justify-content: space-between; align-items: center;
+    flex-shrink: 0;
+}
+#s-tabs { 
+    display: flex; background: #f8f9fa; border-bottom: 1px solid #eee; 
+    flex-shrink: 0;
+}
+#s-search-box {
+    padding: 12px 20px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    flex-shrink: 0;
+}
+#skill-search {
+    width: 100%;
+    padding: 8px 15px;
+    border: 2px solid #e0d5c1;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: 0.2s;
+}
+#skill-search:focus { border-color: var(--excel-green); }
+
+#s-list { 
+    flex: 1; 
+    overflow-y: auto; 
+    padding: 10px;
+    background: #fdfaf0; /* 羊皮紙底色感 */
+}
+
+.s-card { 
+    margin: 10px; padding: 15px; border-radius: 12px; 
+    background: #fff; border: 1px solid #e0d5c1; transition: 0.3s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.s-card:hover { transform: translateX(5px); border-color: var(--excel-green-light); box-shadow: 0 5px 15px rgba(33,115,70,0.1); }
+
+/* --- 輔助與特效 --- */
+.hl-excel { color: var(--excel-green); font-weight: 800; border-bottom: 1px dashed var(--excel-green); }
+.hl-gold { color: var(--gold-dark); font-weight: 800; text-shadow: 0 0 5px rgba(255, 207, 77, 0.3); }
+
+/* 聊天盒互動狀態：發言中 vs 靜止 --- */
+#elf-bubble, #player-box {
+    transition: all 0.4s ease;
+    filter: brightness(0.7) grayscale(0.5); /* 預設為暗淡 */
+    opacity: 0.8;
+}
+
+#elf-bubble.speaking, #player-box.speaking {
+    filter: brightness(1) grayscale(0);
+    opacity: 1;
+    transform: scale(1.02);
+    border-color: var(--excel-green) !important;
+    box-shadow: 0 0 25px rgba(33, 115, 70, 0.4);
+    z-index: 200;
+}
+
+#elf-bubble.speaking { animation: magic-pulse 2s infinite; }
+#player-box.speaking { animation: player-pulse 2s infinite; }
+
+@keyframes magic-pulse { 
+    0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.5); } 
+    70% { box-shadow: 0 0 0 15px rgba(255, 215, 0, 0); } 
+    100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); } 
+}
+
+@keyframes player-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(33, 115, 70, 0.5); } 
+    70% { box-shadow: 0 0 0 15px rgba(33, 115, 70, 0); } 
+    100% { box-shadow: 0 0 0 0 rgba(33, 115, 70, 0); } 
+}
+
+/* 確保模擬器模式下預設亮度恢復 (非劇情時) */
+#game-main:not(.in-story) #elf-bubble, 
+#game-main:not(.in-story) #player-box {
+    filter: brightness(1) grayscale(0);
+    opacity: 1;
+}
+
+.gl { position: absolute; width: 4px; background: var(--excel-green); z-index: 500; display: none; pointer-events: none; opacity: 0.6; }
+
+/* --- 篩選功能樣式 --- */
+.excel-filter-icon {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border: 1px solid #999;
+    font-size: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 1px;
+    color: #333;
+    z-index: 10;
+    transition: 0.2s;
+}
+.excel-filter-icon:hover {
+    background: #0078d4;
+    color: #fff;
+    border-color: #005a9e;
+}
+.cell.has-filter {
+    padding-right: 18px !important;
+}
+
+#filter-dropdown {
+    position: fixed;
+    background: #fff;
+    border: 1px solid #999;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+    z-index: 11000;
+    width: 200px;
+    padding: 0;
+    font-size: 12px;
+    font-family: "Microsoft JhengHei", sans-serif;
+}
+.filter-header {
+    background: #f3f2f1;
+    padding: 8px 12px;
+    font-weight: bold;
+    border-bottom: 1px solid #edebe9;
+    color: #323130;
+}
+.filter-search {
+    padding: 5px;
+    border-bottom: 1px solid #edebe9;
+}
+.filter-search input {
+    width: 100%;
+    padding: 3px;
+    border: 1px solid #ccc;
+    font-size: 11px;
+}
+.filter-list {
+    max-height: 150px;
+    overflow-y: auto;
+    padding: 5px 0;
+}
+.filter-item {
+    padding: 4px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: default;
+}
+.filter-item:hover {
+    background: #f3f2f1;
+}
+.filter-footer {
+    padding: 10px;
+    border-top: 1px solid #edebe9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* --- 模組：通用彈窗 (Modal Layers) --- */
+.modal-layer {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7); /* 稍微加深背景以補償移除 blur 的視覺感 */
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 6000;
+    animation: fadeIn 0.15s ease-out;
+    will-change: opacity; 
+}
+
+/* --- [新增] 電影感特效：閃光 (Flash) --- */
+.flash-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #fff;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.flash-active {
+    animation: flash-anim 0.4s ease-out;
+}
+
+@keyframes flash-anim {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#trial-card, #dev-card, #excel-format-modal .excel-modal-card {
+    background: #fff;
+    width: 500px;
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 15px 50px rgba(0,0,0,0.4);
+    border: 3px solid #d2b48c;
+    position: relative;
+    transform: translateZ(0); /* 觸發硬體加速 */
+    contain: content; /* 渲染隔離，防止內部異動影響外部佈局 */
+    animation: slideUp 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes slideUp {
+    from { transform: translateZ(0) translateY(15px); opacity: 0; }
+    to { transform: translateZ(0) translateY(0); opacity: 1; }
+}
+
+#trial-situation {
+    font-size: 18px;
+    color: #5d4037;
+    margin-bottom: 25px;
+    line-height: 1.6;
+    font-weight: 500;
+}
+
+.trial-opt-btn {
+    padding: 15px 20px;
+    background: #fdfaf0;
+    border: 2px solid #e0d5c1;
+    border-radius: 12px;
+    text-align: left;
+    font-size: 16px;
+    cursor: pointer;
+    transition: 0.2s;
+    font-weight: 600;
+    color: #4e342e;
+}
+
+.trial-opt-btn:hover {
+    background: #fff;
+    border-color: var(--excel-green);
+    color: var(--excel-green);
+    transform: translateX(10px);
+}
+
+.trial-opt-btn.shake {
+    animation: shake 0.5s ease-in-out;
+    background: #fff5f5;
+    border-color: #ff4757;
+    color: #ff4757;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-10px); }
+    40%, 80% { transform: translateX(10px); }
+}
+
+/* --- 模組：下拉選單 (Excel Dropdown) --- */
+.dropdown-layer {
+    position: fixed;
+    z-index: 6000;
+    background: #fff;
+    border: 1px solid #ccc;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+    min-width: 220px;
+    padding: 5px 0;
+    border-radius: 4px;
+}
+
+.dropdown-item {
+    padding: 10px 20px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.1s;
+}
+
+.dropdown-item:hover {
+    background: var(--hover-blue);
+    color: var(--excel-green);
+}
+
+.dropdown-item .icon { font-size: 18px; }
+.dropdown-item .text { flex: 1; }
+
+/* 捲動條美化 */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 5px; border: 2px solid #f1f1f1; }
+::-webkit-scrollbar-thumb:hover { background: #999; }
+
+/* ==========================================
+   響應式優化 (Responsive Optimization)
+   ========================================== */
+
+/* 1. 筆電/中螢幕寬度 (1024px ~ 1366px) */
+@media screen and (max-width: 1366px) {
+    #left-sidebar { width: 25%; min-width: 280px; padding: 15px; }
+    #excel-container { width: 75%; }
+    .ribbon-btn { min-width: 65px; padding: 6px; }
+    .ribbon-btn img { width: 28px; height: 32px; }
+    .ribbon-btn.big span { font-size: 12px; }
+    #e-t { font-size: 18px; }
+    .p-bubble { font-size: 17px; }
+}
+
+/* 2. 平板寬度 (768px ~ 1023px) */
+@media screen and (max-width: 1023px) {
+    body { flex-direction: column; }
+    #top-row { flex-direction: column; }
+    #left-sidebar { 
+        width: 100%; height: auto; border-right: none; border-bottom: 2px solid var(--excel-green); 
+        padding: 10px 20px; flex-direction: row; align-items: center; gap: 20px;
+    }
+    #elf-panel { width: 80px; margin-bottom: 0; }
+    #elf-img { width: 60px !important; }
+    #elf-bubble { margin-top: 0; padding: 10px 15px; min-height: 80px; }
+    #elf-bubble::before { left: -14px; top: 50%; transform: translateY(-50%) rotate(-90deg); }
+    #player-box { display: none; } /* 行動端隱藏主角思考框以節省空間 */
+    #excel-container { width: 100%; height: 70vh; }
+    #s-btn { right: 15px; top: 10px; width: 45px; height: 45px; }
+    #coin-display { right: 75px; top: 15px; padding: 5px 15px; font-size: 14px; }
+}
+
+/* 3. 劇情對話優化 */
+@media screen and (max-width: 768px) {
+    #s-name { font-size: 24px; padding-left: 15px; }
+    #s-text { font-size: 20px; }
+    #dialogue-box { padding: 20px 8% 40px 8%; }
+    .char-container { width: 80%; }
+}
+
+/* 4. 極致平滑過渡 (優化版：精確指定屬性以提升性能) */
+#left-sidebar, #excel-container, #elf-bubble {
+    transition: width 0.3s, height 0.3s, transform 0.3s, opacity 0.3s, background-color 0.3s;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.ribbon-btn {
+    transition: background-color 0.2s, transform 0.2s, border-color 0.2s;
+}
+/* 賽爾筆記：身陷險境的強化樣式 */
+.fairy-note-body {
+    background: #fdf5e6;
+    background-image: 
+        radial-gradient(circle at 2px 2px, rgba(0,0,0,0.02) 1px, transparent 0),
+        linear-gradient(rgba(139,69,19,0.03) 1px, transparent 1px);
+    background-size: 20px 20px, 100% 1.8em;
+    width: 420px;
+    padding: 50px 40px;
+    border: 1px solid #d2b48c;
+    box-shadow: 
+        3px 3px 0px #c0a080,
+        15px 15px 40px rgba(0,0,0,0.4);
+    transform: rotate(-1.5deg);
+    position: relative;
+    border-radius: 5px 20px 8px 30px / 20px 8px 30px 5px;
+    /* 增加邊緣燒焦/撕裂的視覺感 */
+    mask-image: linear-gradient(to bottom, #000 95%, transparent 100%), 
+                linear-gradient(to right, #000 98%, transparent 100%);
+}
+
+/* 墨水噴濺特效 - 暗示混亂與危險 */
+.ink-splatter {
+    position: absolute;
+    background: #2c1810; /* 深褐色乾墨水感 */
+    border-radius: 50%;
+    filter: blur(1.5px);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 5;
+}
+.splatter-1 { top: 15%; right: 10%; width: 12px; height: 12px; }
+.splatter-2 { top: 18%; right: 14%; width: 6px; height: 6px; }
+.splatter-3 { bottom: 25%; left: 8%; width: 20px; height: 18px; opacity: 0.5; transform: rotate(15deg); }
+
+/* 模擬急促中斷的劃痕 */
+.hl-emergency-streak {
+    display: inline-block;
+    width: 100px;
+    height: 3px;
+    background: #2c1810;
+    vertical-align: middle;
+    transform: rotate(-2deg);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+}
+
+/* 摺角特效 */
+.fairy-note-body::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0 40px 40px 0;
+    border-color: transparent rgba(0,0,0,0.1) transparent transparent;
+    pointer-events: none;
+}
+
+.fairy-note-body::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 0; height: 0;
+    border-style: solid;
+    border-width: 0 38px 38px 0;
+    border-color: transparent #e0d5c1 transparent transparent;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.note-tag {
+    position: absolute;
+    top: 0;
+    left: 20px;
+    background: var(--excel-green);
+    color: #fff;
+    padding: 4px 15px;
+    font-size: 13px;
+    font-weight: bold;
+    border-radius: 0 0 5px 5px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+#note-content {
+    color: #2c1810;
+    line-height: 1.8;
+    font-size: 18px; /* 稍微加大字體 */
+    white-space: pre-wrap;
+    letter-spacing: 1.5px;
+    font-weight: 500;
+}
+
+/* 塗黑效果優化：真正無法閱讀的厚重墨跡 */
+.hl-black {
+    background: #000;
+    color: transparent; /* 文字完全透明 */
+    border-radius: 2px;
+    padding: 0 6px;
+    margin: 0 2px;
+    box-shadow: 
+        0 0 2px #000,
+        inset 0 0 8px rgba(0,0,0,1),
+        2px 2px 5px rgba(0,0,0,0.3);
+    display: inline-block;
+    user-select: none; /* 禁止選取 */
+    cursor: default;
+    /* 增加手塗的隨機感 */
+    transform: rotate(-0.5deg) skewX(-2deg);
+    position: relative;
+    overflow: hidden;
+    filter: blur(0.4px); /* 模擬墨水邊緣滲透感 */
+}
+
+/* 模擬墨跡重疊的筆觸質感 */
+.hl-black::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(255,255,255,0.05),
+        rgba(255,255,255,0.05) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+    pointer-events: none;
+}
+
+/* 刪除線效果優化 */
+.hl-strike {
+    text-decoration: line-through;
+    text-decoration-thickness: 3px;
+    text-decoration-color: rgba(0,0,0,0.4);
+    opacity: 0.8;
+    font-style: italic;
+}
+
+.note-close-btn {
+    margin-top: 25px;
+    width: 100%;
+    padding: 12px;
+    background: var(--excel-green);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+    transition: 0.2s;
+    box-shadow: 0 4px 10px rgba(33,115,70,0.3);
+}
+
+.note-close-btn:hover {
+    background: var(--excel-green-light);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(33,115,70,0.4);
+}
+
+/* --- [新增] 電影感特效：震動 (Shake) --- */
+.shake-active {
+    animation: stage-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes stage-shake {
+    10%, 90% { transform: translate3d(-3px, 2px, 0); }
+    20%, 80% { transform: translate3d(5px, -3px, 0); }
+    30%, 50%, 70% { transform: translate3d(-10px, 4px, 0); }
+    40%, 60% { transform: translate3d(10px, -4px, 0); }
+}
+
+/* --- [新增] 電影感特效：場景轉換/轉場 (Scene Transform) --- */
+.scene-transforming {
+    animation: scene-magic 1.5s ease-in-out forwards;
+}
+
+@keyframes scene-magic {
+    0% { filter: blur(0) brightness(1) saturate(1); transform: scale(1); }
+    40% { filter: blur(8px) brightness(2.5) saturate(2); transform: scale(1.08); }
+    60% { filter: blur(8px) brightness(2.5) saturate(2); transform: scale(1.08); }
+    100% { filter: blur(0) brightness(1) saturate(1); transform: scale(1); }
+}
+
+/* --- [新增] 環境特效：大氣漂浮 (Env Drift) --- */
+
+/* --- [新增] 背景模糊特效層 --- */
+#story-bg-blur {
+    position: absolute;
+    inset: 0;
+    z-index: 0; /* 低於角色容器 (z-index: 1) */
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px); /* 增加瀏覽器相容性 */
+    pointer-events: none;
+    transition: backdrop-filter 0.5s ease, -webkit-backdrop-filter 0.5s ease;
+    background-color: rgba(255, 255, 255, 0.01); 
+    transform: translateZ(0);
+}
+
+
+/* [新增]: 樞紐分析表引導動畫 (超強力版) */
+.tutorial-highlight-pulse {
+    animation: pivot-pulse-strong 1s infinite !important;
+    position: relative;
+    z-index: 9999 !important;
+    border: 3px solid #ffcf4d !important; /* 金色邊框 */
+    background-color: #fff9c4 !important; /* 淺金背景 */
+}
+@keyframes pivot-pulse-strong {
+    0% { box-shadow: 0 0 0px #ffcf4d; transform: scale(1); }
+    50% { box-shadow: 0 0 20px #ffcf4d, inset 0 0 10px #ffcf4d; transform: scale(1.02); }
+    100% { box-shadow: 0 0 0px #ffcf4d; transform: scale(1); }
+}
